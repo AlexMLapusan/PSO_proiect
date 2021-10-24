@@ -139,7 +139,7 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-void verify_list_fwd_t (struct list *list);
 bool thread_compare (const struct list_elem *e1,const struct list_elem *e2, void *aux UNUSED);
+void swap_to_highest_prio(void);
 
 #endif /* threads/thread.h */

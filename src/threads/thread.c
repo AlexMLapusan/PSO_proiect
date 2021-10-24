@@ -209,19 +209,7 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
-  /*int new_prio = t->priority;
-  int crt_prio = thread_get_priority();
-
-  // fara && crt_prio != 0
-  if(new_prio > crt_prio)
-  {
-    if(intr_context ())
-    {
-      intr_yield_on_return();
-    } else {
-      thread_yield();
-    }
-  }*/
+  swap_to_highest_prio();
 
   return tid;
 }
@@ -259,25 +247,10 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  //list_push_back (&ready_list, &t->elem);
   list_insert_ordered (&ready_list, &t->elem, thread_compare, NULL);
-  //verify_list_fwd_t (&ready_list) ;
   t->status = THREAD_READY;
 
   intr_set_level (old_level);
-
-  int new_prio = t->priority;
-  int crt_prio = thread_get_priority();
-
-  if(new_prio > crt_prio && thread_current() != idle_thread)
-  {
-    if(intr_context ())
-    {
-      intr_yield_on_return();
-    } else {
-      thread_yield();
-    }
-  }
 }
 
 /* Returns the name of the running thread. */
@@ -633,21 +606,6 @@ allocate_tid (void)
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
 
-void
-verify_list_fwd_t (struct list *list) 
-{
-  struct list_elem *e;
-  int i;
-  
-  for (i = 0, e = list_begin (list);
-       e != list_end (list);
-       i++, e = list_next (e)) 
-    {
-      struct thread *v = list_entry (e, struct thread, elem);
-      printf("%d-",v->priority);
-    }
-}
-
 bool thread_compare (const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) 
 {
   struct thread * pTh1 ;
@@ -656,4 +614,17 @@ bool thread_compare (const struct list_elem *e1, const struct list_elem *e2, voi
   pTh2 = list_entry ( e2, struct thread, elem);
 
   return pTh1->priority > pTh2->priority;
+}
+
+void swap_to_highest_prio(void) {
+  if (!list_empty(&ready_list)) {
+    struct thread * first = list_entry(list_front(&ready_list), struct thread, elem);
+    if (thread_current ()->priority < first->priority) {
+      if (intr_context()) {
+        intr_yield_on_return ();
+      } else {
+        thread_yield ();
+      }
+    }
+  }
 }
