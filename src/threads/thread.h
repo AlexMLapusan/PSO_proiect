@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 
+
 /* States in a thread's life cycle. */
 enum thread_status
   {
@@ -83,15 +84,20 @@ typedef int tid_t;
 struct thread
   {
     /* Owned by thread.c. */
-    tid_t tid;                          /* Thread identifier. */
-    enum thread_status status;          /* Thread state. */
-    char name[16];                      /* Name (for debugging purposes). */
-    uint8_t *stack;                     /* Saved stack pointer. */
-    int priority;                       /* Priority. */
-    struct list_elem allelem;           /* List element for all threads list. */
+   tid_t tid;                          /* Thread identifier. */
+   enum thread_status status;          /* Thread state. */
+   char name[16];                      /* Name (for debugging purposes). */
+   uint8_t *stack;                     /* Saved stack pointer. */
+   int priority;                       /* Priority. */
+   struct list_elem allelem;           /* List element for all threads list. */
 
-    /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element. */
+   //Used for priority donation
+   int real_priority;                  /*The original priority*/
+   struct list acquired_locks_list;    /*The list of locks held by the thread*/
+   struct lock* waited_lock;           /*the lock the thread waits for*/
+
+   /* Shared between thread.c and synch.c. */
+   struct list_elem elem;              /* List element. */
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -138,4 +144,9 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+void verify_list_fwd_t (struct list *list);
+bool thread_compare (const struct list_elem *e1,const struct list_elem *e2, void *aux UNUSED);
+
+void thread_donate_priority(); //called in lock_acquire
+void thread_recompute_priority(); //called in lock_release
 #endif /* threads/thread.h */

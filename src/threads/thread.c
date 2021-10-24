@@ -245,9 +245,26 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  //list_push_back (&ready_list, &t->elem);
+  list_insert_ordered (&ready_list, &t->elem, thread_compare, NULL);
+  //verify_list_fwd_t (&ready_list) ;
   t->status = THREAD_READY;
+
   intr_set_level (old_level);
+
+  int new_prio = t->priority;
+  int crt_prio = thread_get_priority();
+
+  // fara && crt_prio != 0
+  if(new_prio > crt_prio && crt_prio != 0 )
+  {
+    if(intr_context ())
+    {
+      intr_yield_on_return();
+    } else {
+      thread_yield();
+    }
+  }
 }
 
 /* Returns the name of the running thread. */
@@ -316,7 +333,8 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    list_insert_ordered (&ready_list, &cur->elem, thread_compare, NULL);
+
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -343,7 +361,14 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+    thread_current ()->real_priority = new_priority;
+
+    if(intr_context ())
+    {
+      intr_yield_on_return();
+    } else {
+      thread_yield();
+    }
 }
 
 /* Returns the current thread's priority. */
@@ -467,8 +492,10 @@ init_thread (struct thread *t, const char *name, int priority)
   t->status = THREAD_BLOCKED;
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
-  t->priority = priority;
+  t->real_priority = priority;
   t->magic = THREAD_MAGIC;
+  list_init(&t->acquired_locks_list);
+  t->waited_lock = NULL;
   list_push_back (&all_list, &t->allelem);
 }
 
@@ -585,3 +612,69 @@ allocate_tid (void)
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
 uint32_t thread_stack_ofs = offsetof (struct thread, stack);
+
+void
+verify_list_fwd_t (struct list *list) 
+{
+  struct list_elem *e;
+  int i;
+  
+  for (i = 0, e = list_begin (list);
+       e != list_end (list);
+       i++, e = list_next (e)) 
+    {
+      struct thread *v = list_entry (e, struct thread, elem);
+      printf("%d-",v->priority);
+    }
+}
+
+bool thread_compare (const struct list_elem *e1, const struct list_elem *e2, void *aux UNUSED) 
+{
+  struct thread * pTh1 ;
+  pTh1 = list_entry (e1, struct thread, elem);
+  struct thread * pTh2 ;
+  pTh2 = list_entry ( e2, struct thread, elem);
+  int prio1 = pTh1->priority;
+  int prio2 = pTh2->priority;
+  //printf("\n%d %d %d %d\n",  pTh1->tid, pTh2->tid, prio1, prio2);
+  if(prio1 > prio2) return true;
+  return false;
+}
+
+void thread_donate_priority(){
+  struct thread *donor = thread_current ();
+  struct lock *waited_lock = donor->waited_lock;
+  while(waited_lock){
+    if(donor->priority > waited_lock->holder->priority){
+      waited_lock->holder->priority = donor->priority;
+    }
+    donor = waited_lock->holder;
+    waited_lock = donor->waited_lock;
+  }  
+}
+
+void thread_recompute_priority(){
+  struct thread *current_thread = thread_current();
+  int current_max = current_thread->real_priority;
+  struct list acq_locks_list = current_thread->acquired_locks_list; 
+
+  
+  //iterate the list of acquired locks
+  // struct list_elem *e;
+  // for (e = list_begin(&acq_locks_list); e != list_end (&acq_locks_list); e = list_next (e))
+  // {
+  //   struct lock *current_lock = list_entry(e, struct lock, acquired_lock_list_elem);
+  //   struct list waiting_threads = current_lock->waiters;
+    
+  //   struct list_elem *lock_elem;
+  //   for (lock_elem = list_begin(&waiting_threads); lock_elem != list_end (&waiting_threads);lock_elem = list_next (lock_elem))
+  //   { 
+  //     struct thread *current_lock_thread = list_entry(lock_elem, struct thread, elem);
+  //     if(current_lock_thread->real_priority > current_max){
+  //       current_max = current_lock_thread->real_priority;
+  //     }
+  //   }  
+  // }
+
+  current_thread->priority = current_max;
+}
