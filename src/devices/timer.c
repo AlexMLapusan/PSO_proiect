@@ -17,13 +17,18 @@
 #error TIMER_FREQ <= 1000 recommended
 #endif
 
+
+static struct list alarm_clock_list;
+//prin faptul ca l-am declarat static o sa fie vizibil doar in fisierul timer.c (vrem asta din motive de modularitate)
+
+
 /* Number of timer ticks since OS booted. */
 static int64_t ticks;
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
 static unsigned loops_per_tick;
-
+static bool alarm_clock_compare(const struct list_elem *, const struct list_elem *, void *);
 static intr_handler_func timer_interrupt;
 static bool too_many_loops (unsigned loops);
 static void busy_wait (int64_t loops);
@@ -37,6 +42,7 @@ timer_init (void)
 {
   pit_configure_channel (0, 2, TIMER_FREQ);
   intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+  list_init (&alarm_clock_list);
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
@@ -89,11 +95,31 @@ timer_elapsed (int64_t then)
 void
 timer_sleep (int64_t ticks) 
 {
-  int64_t start = timer_ticks ();
+  struct alarm_clock *alarm = (struct alarm_clock *)calloc(1,sizeof(struct alarm_clock));
+  /*struct alarm_clock alarm = {
+    0,
+    NULL,
+    NULL
+  };*/
+  //struct alarm_clock *alarm = malloc (sizeof *alarm);
+  if (alarm == NULL)
+    PANIC ("Failed to allocate memory for block device descriptor");
 
-  ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+  alarm->waking_time = timer_ticks () + ticks;
+  alarm->thread = thread_current();
+  //alarm->alarm_clock_elem = NULL;
+
+  intr_disable(); //avoid race conditions atat la inserarea in lista globala, cat si la thread_block si unblock
+
+  list_insert_ordered(&alarm_clock_list, &alarm->alarm_clock_elem, alarm_clock_compare, NULL);
+
+  thread_block();
+
+  //intreruperile raman disable pana cand primesc unblock, insa DOAR PE THREAD-UL CURENT
+  intr_enable();
+
+  //e ok sa fie aici?
+  //free(alarm);
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
@@ -172,6 +198,9 @@ timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
   thread_tick ();
+  //printf("Context change at: %lld \n",ticks);
+  //printf("%lld\n", ticks);
+  alarm_clock_check_all();//asta putea fi apelata si in thread_tick, dar am preferat sa fie treaba timer-ului
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
@@ -243,4 +272,39 @@ real_time_delay (int64_t num, int32_t denom)
      the possibility of overflow. */
   ASSERT (denom % 1000 == 0);
   busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000)); 
+}
+
+static bool alarm_clock_compare(const struct list_elem *t1,const struct list_elem *t2, void* aux UNUSED){
+  struct alarm_clock *c1 = list_entry (t1, struct alarm_clock, alarm_clock_elem);
+  struct alarm_clock *c2 = list_entry (t2, struct alarm_clock, alarm_clock_elem);
+  return c1->waking_time < c2->waking_time;
+}
+
+bool alarm_clock_check(struct alarm_clock* alarm){
+  if(timer_ticks() >= alarm->waking_time){
+    list_pop_front(&alarm_clock_list); 
+    thread_unblock(alarm->thread);
+    return false;
+  }
+  return true; //in cazul in care nu e mai mare, nu are rost sa cautam mai departe in lista!
+}
+
+void alarm_clock_check_all(void){
+ 
+  struct list_elem *e;
+
+  for (e = list_begin (&alarm_clock_list); e != list_end (&alarm_clock_list); e = list_next(e)){
+      struct alarm_clock *current_clock = list_entry (e, struct alarm_clock, alarm_clock_elem);
+      //printf("%lld\n",current_clock->waking_time);
+      ASSERT(current_clock->thread != NULL);
+      //printf("%d\n",current_clock->thread->tid);
+      //printf("%d\n",current_clock->thread->parent_tid);
+      if(alarm_clock_check(current_clock)){
+        break;
+      }else{
+        //teoretic cand se trezeste timer-ul trebuie dat free
+        //free(alarm);
+      }
+  }
+
 }
