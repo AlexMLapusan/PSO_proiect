@@ -202,8 +202,8 @@ lock_acquire (struct lock *lock)
 
   while(lock->value == 0){
     list_push_back(&lock->waiters, &thread_current()->elem);
-    thread_donate_priority();
     thread_current()->waited_lock = lock;
+    thread_donate_priority();
     thread_block();
   }
 
@@ -247,17 +247,22 @@ lock_release (struct lock *lock)
   ASSERT (lock_held_by_current_thread (lock));
   old_level = intr_disable();
 
-  // thread_recompute_priority();
+  // if(lock->holder->priority != lock->holder->real_priority){
+  //   lock->holder->priority = lock->holder->real_priority;
+  // }
   
-  if(lock->holder->priority != lock->holder->real_priority){
-    lock->holder->priority = lock->holder->real_priority;
-  }
+  //eliminate the lock from the acquired_locks_list list
+  list_remove(&lock->acquired_lock_list_elem);
 
+  thread_recompute_priority();
+  
+  lock->holder = NULL;
+  lock->value = 1;
+  
   if(!list_empty(&lock->waiters)){
     thread_unblock(list_entry(list_pop_front(&lock->waiters), struct thread, elem));
   }
-  lock->holder = NULL;
-  lock->value = 1;
+
   intr_set_level(old_level);
 }
 

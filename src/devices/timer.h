@@ -3,9 +3,19 @@
 
 #include <round.h>
 #include <stdint.h>
+#include <list.h>
 
 /* Number of timer interrupts per second. */
 #define TIMER_FREQ 100
+
+struct alarm_clock {
+    // time to wake up
+    int64_t waking_time; //when the clock expires
+    // thread to be awaken
+    struct thread* thread; //thread-ul asociat clock-ului
+    // to add the timer in the global list of timers
+    struct list_elem alarm_clock_elem;
+};
 
 void timer_init (void);
 void timer_calibrate (void);

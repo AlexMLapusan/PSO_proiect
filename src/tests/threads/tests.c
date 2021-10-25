@@ -29,15 +29,15 @@ static struct test tests[] =
     {"priority-preempt", test_priority_preempt},
     {"priority-sema", test_priority_sema},
     {"priority-condvar", test_priority_condvar},
-    {"mlfqs-load-1", test_mlfqs_load_1},
-    {"mlfqs-load-60", test_mlfqs_load_60},
-    {"mlfqs-load-avg", test_mlfqs_load_avg},
-    {"mlfqs-recent-1", test_mlfqs_recent_1},
-    {"mlfqs-fair-2", test_mlfqs_fair_2},
-    {"mlfqs-fair-20", test_mlfqs_fair_20},
-    {"mlfqs-nice-2", test_mlfqs_nice_2},
-    {"mlfqs-nice-10", test_mlfqs_nice_10},
-    {"mlfqs-block", test_mlfqs_block},
+    // {"mlfqs-load-1", test_mlfqs_load_1},
+    // {"mlfqs-load-60", test_mlfqs_load_60},
+    // {"mlfqs-load-avg", test_mlfqs_load_avg},
+    // {"mlfqs-recent-1", test_mlfqs_recent_1},
+    // {"mlfqs-fair-2", test_mlfqs_fair_2},
+    // {"mlfqs-fair-20", test_mlfqs_fair_20},
+    // {"mlfqs-nice-2", test_mlfqs_nice_2},
+    // {"mlfqs-nice-10", test_mlfqs_nice_10},
+    // {"mlfqs-block", test_mlfqs_block},
   };
 
 static const char *test_name;
@@ -106,32 +106,32 @@ run_test (const char *name)
   tests[17].name = "priority-condvar";
   tests[17].function = test_priority_condvar;
 
-  tests[18].name = "mlfqs-load-1";
-  tests[18].function = test_mlfqs_load_1;
+  // tests[18].name = "mlfqs-load-1";
+  // tests[18].function = test_mlfqs_load_1;
 
-  tests[19].name = "mlfqs-load-60";
-  tests[19].function = test_mlfqs_load_60;
+  // tests[19].name = "mlfqs-load-60";
+  // tests[19].function = test_mlfqs_load_60;
 
-  tests[20].name = "mlfqs-load-avg";
-  tests[20].function = test_mlfqs_load_avg;
+  // tests[20].name = "mlfqs-load-avg";
+  // tests[20].function = test_mlfqs_load_avg;
 
-  tests[21].name = "mlfqs-recent-1";
-  tests[21].function = test_mlfqs_recent_1;
+  // tests[21].name = "mlfqs-recent-1";
+  // tests[21].function = test_mlfqs_recent_1;
 
-  tests[22].name = "mlfqs-fair-2";
-  tests[22].function = test_mlfqs_fair_2;
+  // tests[22].name = "mlfqs-fair-2";
+  // tests[22].function = test_mlfqs_fair_2;
 
-  tests[23].name = "mlfqs-fair-20";
-  tests[23].function = test_mlfqs_fair_20;
+  // tests[23].name = "mlfqs-fair-20";
+  // tests[23].function = test_mlfqs_fair_20;
 
-  tests[24].name = "mlfqs-nice-2";
-  tests[24].function = test_mlfqs_nice_2;
+  // tests[24].name = "mlfqs-nice-2";
+  // tests[24].function = test_mlfqs_nice_2;
 
-  tests[25].name = "mlfqs-nice-10";
-  tests[25].function = test_mlfqs_nice_10;
+  // tests[25].name = "mlfqs-nice-10";
+  // tests[25].function = test_mlfqs_nice_10;
 
-  tests[26].name = "mlfqs-block";
-  tests[26].function = test_mlfqs_block;
+  // tests[26].name = "mlfqs-block";
+  // tests[26].function = test_mlfqs_block;
 
   // END - added at UTCN (2018)
 

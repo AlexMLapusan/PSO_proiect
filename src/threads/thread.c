@@ -209,6 +209,19 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /*int new_prio = t->priority;
+  int crt_prio = thread_get_priority();
+  // fara && crt_prio != 0
+  if(new_prio > crt_prio)
+  {
+    if(intr_context ())
+    {
+      intr_yield_on_return();
+    } else {
+      thread_yield();
+    }
+  }*/
+
   return tid;
 }
 
@@ -255,8 +268,7 @@ thread_unblock (struct thread *t)
   int new_prio = t->priority;
   int crt_prio = thread_get_priority();
 
-  // fara && crt_prio != 0
-  if(new_prio > crt_prio && crt_prio != 0 )
+  if(new_prio > crt_prio && thread_current() != idle_thread)
   {
     if(intr_context ())
     {
@@ -361,14 +373,27 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+    int crt_prio = thread_current ()->priority; 
+    thread_current ()->priority = new_priority;
     thread_current ()->real_priority = new_priority;
-
-    if(intr_context ())
+    thread_recompute_priority();
+    //if the thread DECREASED its own priority maybe yield the CPU 
+    if(crt_prio > new_priority && !list_empty(&ready_list))
     {
-      intr_yield_on_return();
-    } else {
-      thread_yield();
+      struct list_elem *first = list_front(&ready_list);
+      struct thread *first_th = list_entry (first, struct thread, elem);
+      if(new_priority < first_th->priority)
+      {
+          if(intr_context ())
+          {
+            intr_yield_on_return();
+          } else {
+            thread_yield();
+          }
+      }
     }
+
+   
 }
 
 /* Returns the current thread's priority. */
@@ -493,6 +518,7 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->real_priority = priority;
+  t->priority = priority;
   t->magic = THREAD_MAGIC;
   list_init(&t->acquired_locks_list);
   t->waited_lock = NULL;
@@ -634,11 +660,8 @@ bool thread_compare (const struct list_elem *e1, const struct list_elem *e2, voi
   pTh1 = list_entry (e1, struct thread, elem);
   struct thread * pTh2 ;
   pTh2 = list_entry ( e2, struct thread, elem);
-  int prio1 = pTh1->priority;
-  int prio2 = pTh2->priority;
-  //printf("\n%d %d %d %d\n",  pTh1->tid, pTh2->tid, prio1, prio2);
-  if(prio1 > prio2) return true;
-  return false;
+
+  return pTh1->priority > pTh2->priority;
 }
 
 void thread_donate_priority(){
@@ -655,26 +678,32 @@ void thread_donate_priority(){
 
 void thread_recompute_priority(){
   struct thread *current_thread = thread_current();
-  int current_max = current_thread->real_priority;
-  struct list acq_locks_list = current_thread->acquired_locks_list; 
+  int current_max = current_thread->real_priority; 
 
-  
-  //iterate the list of acquired locks
-  // struct list_elem *e;
-  // for (e = list_begin(&acq_locks_list); e != list_end (&acq_locks_list); e = list_next (e))
-  // {
-  //   struct lock *current_lock = list_entry(e, struct lock, acquired_lock_list_elem);
-  //   struct list waiting_threads = current_lock->waiters;
-    
-  //   struct list_elem *lock_elem;
-  //   for (lock_elem = list_begin(&waiting_threads); lock_elem != list_end (&waiting_threads);lock_elem = list_next (lock_elem))
-  //   { 
-  //     struct thread *current_lock_thread = list_entry(lock_elem, struct thread, elem);
-  //     if(current_lock_thread->real_priority > current_max){
-  //       current_max = current_lock_thread->real_priority;
-  //     }
-  //   }  
-  // }
+  // //iterate the list of acquired locks
+  struct list_elem *e;
+  for (e = list_begin(&current_thread->acquired_locks_list); e != list_end (&current_thread->acquired_locks_list); e = list_next (e))
+  {
+    struct lock *current_lock = list_entry(e, struct lock, acquired_lock_list_elem);
+    // struct list waiting_threads = current_lock->waiters;
+
+      // if(!list_empty(&current_lock->waiters)){
+      //   struct thread *possible_thread = list_entry(list_head(&current_lock->waiters),struct thread, elem);
+      //   if(possible_thread->priority > current_max){
+      //     current_max = possible_thread->priority;
+      //   }
+      // }
+    if(!list_empty(&current_lock->waiters)){
+      struct list_elem *lock_elem;
+      for (lock_elem = list_begin(&current_lock->waiters); lock_elem != list_end (&current_lock->waiters);lock_elem = list_next (lock_elem))
+      { 
+        struct thread *current_lock_thread = list_entry(lock_elem, struct thread, elem);
+        if(current_lock_thread->priority > current_max){
+          current_max = current_lock_thread->priority;
+        }
+      }
+    }
+  }
 
   current_thread->priority = current_max;
 }
